@@ -245,4 +245,3 @@ The core logic in `src/lib/` is where contributions matter most. Some open quest
 
 1. **Secrets** — Never commit `.env` or `.env.local`. Only `.env.example` (no real keys) is in version control.
 2. **Build check** — Run `npm run build` to confirm the project compiles.
-3. **License** — Add a `LICENSE` file if publishing as open source.
