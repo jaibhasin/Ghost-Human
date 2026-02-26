@@ -35,3 +35,25 @@ Give AI-generated text a human touch. GhostHuman rewrites stiff, robotic copy in
 - **Ghost theme**: Ethereal UI with translucent cards and soft glow
 
 Built with Next.js, Tailwind CSS, and GPT-5 Nano.
+
+## Backend logging
+
+When you run `npm run dev`, the terminal shows what the backend is doing:
+
+- `[GhostHuman] POST /api/humanize` — request received
+- Validation (text length, tone, strength)
+- `Starting humanize` — options and word count
+- `Calling OpenAI for rewrite` / `Rewrite done`
+- `Meaning check` — result or retry if meaning drifted
+- `Computing quality metrics` and `Success` with elapsed time and score
+
+Errors are logged with `[GhostHuman] Error` and the thrown exception.
+
+## Publishing this repo
+
+Before pushing publicly:
+
+1. **Secrets** — Never commit `.env` or `.env.local`. They are in `.gitignore`; only `.env.example` (no real keys) should be committed.
+2. **Dependencies** — Run `npm run build` to confirm the project builds.
+3. **README** — This file explains setup; new users need an OpenAI API key and `cp .env.example .env.local`.
+4. **License** — Add a `LICENSE` file (e.g. MIT) if you want to publish as open source.

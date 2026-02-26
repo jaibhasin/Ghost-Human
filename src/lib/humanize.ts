@@ -44,17 +44,25 @@ async function callRewrite(
     ? "\n\nCRITICAL: A previous rewrite lost meaning. Be extremely careful to preserve every single fact, number, and claim from the original. Do not omit anything."
     : "";
 
+  console.log("[GhostHuman] Calling OpenAI for rewrite", {
+    model: MODEL,
+    stricter,
+    promptChars: (systemPrompt + extraInstruction + buildUserPrompt(text)).length,
+  });
   const response = await openai.chat.completions.create({
     model: MODEL,
     messages: [
       { role: "system", content: systemPrompt + extraInstruction },
       { role: "user", content: buildUserPrompt(text) },
     ],
-    temperature: options.tone === "friendly" ? 0.8 : 0.6,
-    max_tokens: 4096,
+    max_completion_tokens: 4096,
   });
-
-  return response.choices[0]?.message?.content?.trim() ?? "";
+  const out = response.choices[0]?.message?.content?.trim() ?? "";
+  console.log("[GhostHuman] Rewrite done", {
+    outputLength: out.length,
+    usage: (response as { usage?: { total_tokens?: number } }).usage?.total_tokens ?? "—",
+  });
+  return out;
 }
 
 async function checkMeaning(
@@ -62,6 +70,7 @@ async function checkMeaning(
   rewritten: string
 ): Promise<{ preserved: boolean; issues: string[]; severity: string }> {
   try {
+    console.log("[GhostHuman] Meaning check: calling OpenAI");
     const response = await openai.chat.completions.create({
       model: MODEL,
       messages: [
@@ -72,19 +81,21 @@ async function checkMeaning(
         },
         { role: "user", content: buildEvaluatorPrompt(original, rewritten) },
       ],
-      temperature: 0.1,
-      max_tokens: 512,
+      max_completion_tokens: 512,
     });
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "{}";
     const cleaned = raw.replace(/```json\n?|```/g, "").trim();
     const parsed = JSON.parse(cleaned);
-    return {
+    const result = {
       preserved: parsed.meaningPreserved ?? true,
       issues: parsed.issuesFound ?? [],
       severity: parsed.severity ?? "none",
     };
-  } catch {
+    console.log("[GhostHuman] Meaning check result", result);
+    return result;
+  } catch (e) {
+    console.warn("[GhostHuman] Meaning check failed, assuming preserved", e);
     return { preserved: true, issues: [], severity: "none" };
   }
 }
@@ -98,11 +109,13 @@ export async function humanize(
   let retried = false;
 
   if (!meaningCheck.preserved && meaningCheck.severity === "major") {
+    console.log("[GhostHuman] Major meaning drift — retrying with stricter constraints");
     rewritten = await callRewrite(text, options, true);
     meaningCheck = await checkMeaning(text, rewritten);
     retried = true;
   }
 
+  console.log("[GhostHuman] Computing quality metrics");
   const metrics = computeMetrics(text, rewritten);
 
   return {
