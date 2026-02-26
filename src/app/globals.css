@@ -1,18 +1,25 @@
 @import "tailwindcss";
 
+/* Ghost theme — ethereal, pale, translucent */
 :root {
-  --background: #0b0f1a;
-  --foreground: #e4e8f1;
-  --card: #111827;
-  --card-border: #1e293b;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-muted: rgba(99, 102, 241, 0.15);
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --background: #0a0d12;
+  --background-glow: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(148, 163, 184, 0.08), transparent 60%);
+  --foreground: #e2e8f0;
+  --foreground-soft: #cbd5e1;
+  --card: rgba(15, 23, 42, 0.7);
+  --card-border: rgba(148, 163, 184, 0.12);
+  --card-glass: rgba(30, 41, 59, 0.4);
+  --accent: #94a3b8;
+  --accent-glow: rgba(148, 163, 184, 0.25);
+  --accent-hover: #cbd5e1;
+  --accent-muted: rgba(148, 163, 184, 0.12);
+  --ghost-white: rgba(241, 245, 249, 0.9);
+  --success: #6ee7b7;
+  --warning: #fcd34d;
+  --danger: #f87171;
   --muted: #64748b;
-  --surface: #1e293b;
+  --surface: rgba(30, 41, 59, 0.5);
+  --surface-ghost: rgba(51, 65, 85, 0.35);
 }
 
 @theme inline {
@@ -23,6 +30,7 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-muted: var(--accent-muted);
+  --color-ghost-white: var(--ghost-white);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
@@ -44,9 +52,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--background-glow);
+  pointer-events: none;
+  z-index: 0;
+}
+
 ::selection {
-  background: var(--accent);
-  color: white;
+  background: var(--accent-muted);
+  color: var(--ghost-white);
 }
 
 textarea:focus,
@@ -66,19 +83,38 @@ button:focus-visible {
   100% { background-position: 200% 0; }
 }
 
-@keyframes pulse-ring {
-  0% { transform: scale(0.8); opacity: 1; }
-  100% { transform: scale(2); opacity: 0; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 20px var(--accent-glow); }
+  50% { opacity: 0.8; box-shadow: 0 0 28px var(--accent-glow); }
 }
 
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+
 .animate-shimmer {
   background: linear-gradient(90deg, var(--card) 25%, var(--surface) 50%, var(--card) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+.ghost-theme .ghost-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(12px);
 }
 
 .prose-output {

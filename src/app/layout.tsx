@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Humanizer — Make AI Text Sound Human",
+  title: "GhostHuman — Make AI Text Sound Human",
   description:
-    "Transform stiff, AI-generated professional writing into clear, natural prose that readers actually enjoy. Powered by GPT-5 Nano.",
+    "Transform stiff, AI-generated writing into clear, natural prose. GhostHuman gives your text a human touch. Powered by GPT-5 Nano.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark ghost-theme">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
       >

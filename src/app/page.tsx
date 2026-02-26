@@ -157,36 +157,36 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative z-[1]">
       {/* Header */}
-      <header className="border-b border-card-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-card-border/50 bg-card/50 backdrop-blur-md sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between relative">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-ghost-white/10 border border-card-border flex items-center justify-center animate-float shadow-[0_0_24px_rgba(148,163,184,0.15)]">
               <svg
-                width="18"
-                height="18"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                fill="currentColor"
+                className="text-foreground/90"
               >
-                <path d="M12 20h9" />
-                <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
+                <path d="M12 2C6.5 2 2 6.5 2 12c0 2 .5 3.5 1 4.5v5h3v-2h2v2h2v-2h2v2h3v-5c.5-1 1-2.5 1-4.5C22 6.5 17.5 2 12 2z" />
+                <circle cx="9" cy="10" r="1.5" fill="#0a0d12" />
+                <circle cx="15" cy="10" r="1.5" fill="#0a0d12" />
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Humanizer</h1>
+              <h1 className="text-lg font-bold tracking-tight text-foreground">
+                GhostHuman
+              </h1>
               <p className="text-xs text-muted hidden sm:block">
-                Transform AI text into natural human writing
+                Give AI text a human touch
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted">
             <span className="hidden sm:inline">Powered by</span>
-            <span className="px-2 py-1 rounded-md bg-surface text-foreground/80 font-mono text-[11px]">
+            <span className="px-2 py-1 rounded-md bg-surface/80 text-foreground/80 font-mono text-[11px] border border-card-border/50">
               GPT-5 Nano
             </span>
           </div>
@@ -197,7 +197,7 @@ export default function Home() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6">
         {/* Left panel — Input */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
-          <div className="rounded-xl border border-card-border bg-card p-4 sm:p-5 flex flex-col flex-1">
+          <div className="ghost-card rounded-xl p-4 sm:p-5 flex flex-col flex-1">
             <div className="flex items-center justify-between mb-3">
               <label
                 htmlFor="input-text"
@@ -342,10 +342,10 @@ export default function Home() {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                           />
                         </svg>
-                        Humanizing...
+                        Ghostifying...
                       </>
                     ) : (
-                      "Humanize"
+                      "Ghostify"
                     )}
                   </button>
                 </div>
@@ -357,7 +357,7 @@ export default function Home() {
         {/* Right panel — Output */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {/* Output card */}
-          <div className="rounded-xl border border-card-border bg-card p-4 sm:p-5 flex flex-col flex-1">
+          <div className="ghost-card rounded-xl p-4 sm:p-5 flex flex-col flex-1">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold text-foreground">
                 Humanized Output
@@ -462,7 +462,7 @@ export default function Home() {
                     <div className="w-10 h-10 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
                   </div>
                   <div className="text-sm text-muted">
-                    Rewriting your text...
+                    Ghostifying your text...
                   </div>
                   <div className="w-48 h-1.5 rounded-full overflow-hidden bg-surface">
                     <div className="h-full rounded-full animate-shimmer bg-accent/40" />
@@ -510,25 +510,24 @@ export default function Home() {
               ) : (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center max-w-xs">
-                    <div className="w-12 h-12 rounded-xl bg-accent-muted flex items-center justify-center mx-auto mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-ghost-white/10 border border-card-border flex items-center justify-center mx-auto mb-3">
                       <svg
-                        width="22"
-                        height="22"
+                        width="24"
+                        height="24"
                         viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        className="text-accent"
+                        fill="currentColor"
+                        className="text-foreground/70"
                       >
-                        <path d="M12 20h9" />
-                        <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
+                        <path d="M12 2C6.5 2 2 6.5 2 12c0 2 .5 3.5 1 4.5v5h3v-2h2v2h2v-2h2v2h3v-5c.5-1 1-2.5 1-4.5C22 6.5 17.5 2 12 2z" />
+                        <circle cx="9" cy="10" r="1.5" fill="#0a0d12" />
+                        <circle cx="15" cy="10" r="1.5" fill="#0a0d12" />
                       </svg>
                     </div>
                     <p className="text-sm text-muted">
                       Your humanized text will appear here
                     </p>
                     <p className="text-xs text-muted/50 mt-1">
-                      Paste text on the left and click Humanize
+                      Paste text on the left and click Ghostify
                     </p>
                   </div>
                 </div>
@@ -546,7 +545,7 @@ export default function Home() {
 
           {/* Metrics card */}
           {result && (
-            <div className="rounded-xl border border-card-border bg-card p-4 sm:p-5 animate-fade-in">
+            <div className="ghost-card rounded-xl p-4 sm:p-5 animate-fade-in">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-foreground">
                   Quality Report
@@ -630,9 +629,9 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-card-border/30 bg-card/30 py-4">
+      <footer className="border-t border-card-border/30 bg-card/50 backdrop-blur-sm py-4 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between text-xs text-muted">
-          <span>Humanizer v1.0</span>
+          <span>GhostHuman v1.0</span>
           <span>
             Built with Next.js + GPT-5 Nano
           </span>
