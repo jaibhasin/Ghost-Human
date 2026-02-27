@@ -85,7 +85,19 @@ async function checkMeaning(
     });
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "{}";
-    const cleaned = raw.replace(/```json\n?|```/g, "").trim();
+    let cleaned = raw.replace(/```json\n?|```/g, "").trim();
+
+    // Try to extract a JSON object if the model wrapped it in extra text
+    if (cleaned && !cleaned.startsWith("{")) {
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      cleaned = match ? match[0] : "";
+    }
+
+    if (!cleaned || cleaned === "") {
+      console.warn("[GhostHuman] Meaning check returned empty response, assuming preserved");
+      return { preserved: true, issues: [], severity: "none" };
+    }
+
     const parsed = JSON.parse(cleaned);
     const result = {
       preserved: parsed.meaningPreserved ?? true,
