@@ -1,6 +1,44 @@
+/**
+ * page.tsx  —  GhostHuman main page (the entire UI)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PURPOSE:
+ *   The root Next.js client component.  Renders the two-column layout:
+ *     Left  — input textarea + tone/strength controls + submit button
+ *     Right — humanized output + quality metrics cards
+ *
+ * KEY UI FEATURES:
+ *   • Character counter with amber/red warning as the 10 000-char limit nears
+ *   • Cmd+Enter / Ctrl+Enter keyboard shortcut to submit
+ *   • Cycling loading messages so the wait feels informative
+ *   • Consolidated warning banner (retried + meaning issues shown together)
+ *   • Output word count displayed alongside the Copy button
+ *   • MetricCard delta values rounded to 1 decimal to avoid float noise
+ *   • Inviting empty-state placeholder in the output panel
+ *
+ * ARCHITECTURE:
+ *   Browser  ──►  POST /api/humanize  (route.ts)
+ *                     └──► humanize.ts  └──► OpenAI GPT
+ *
+ * STATE:
+ *   text            — contents of the input textarea
+ *   tone/strength   — LLM rewriting settings
+ *   preserveKeyPoints — toggle for key-point preservation
+ *   result          — HumanizeResult returned by the API
+ *   loading         — true while the API call is in flight
+ *   error           — error string if the API call failed
+ *   feedback        — "up" | "down" | null — thumbs feedback state
+ *   copied          — true for 2 s after clicking Copy
+ *   loadingMsgIdx   — index into LOADING_MESSAGES for the cycling animation
+ */
+
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * TYPES  (mirror of the backend interfaces — kept here to avoid a cross-
+ *          boundary import of server-only types)
+ * ───────────────────────────────────────────────────────────────────────────── */
 
 type Tone = "professional" | "friendly" | "confident";
 type Strength = "light" | "medium" | "strong";
@@ -31,6 +69,11 @@ interface HumanizeResult {
   retried: boolean;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * CONSTANTS
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/** Tone picker options: value used for the API, label/desc shown in UI. */
 const TONE_OPTIONS: { value: Tone; label: string; desc: string }[] = [
   {
     value: "professional",
@@ -49,12 +92,44 @@ const TONE_OPTIONS: { value: Tone; label: string; desc: string }[] = [
   },
 ];
 
+/** Strength picker options: how aggressively the text is restructured. */
 const STRENGTH_OPTIONS: { value: Strength; label: string; desc: string }[] = [
   { value: "light", label: "Light", desc: "Minimal touch-ups" },
   { value: "medium", label: "Medium", desc: "Balanced rewrite" },
   { value: "strong", label: "Strong", desc: "Full transformation" },
 ];
 
+/**
+ * Messages cycled through during loading to keep the UI informative.
+ * Each message corresponds to a rough stage of the pipeline.
+ */
+const LOADING_MESSAGES = [
+  "Analyzing your text...",
+  "Applying humanization...",
+  "Checking meaning...",
+  "Computing quality metrics...",
+];
+
+/** Hard character limit — must match MAX_INPUT_LENGTH in route.ts. */
+const MAX_CHARS = 10000;
+
+/** Threshold at which the char counter turns amber. */
+const WARN_CHARS = 8000;
+
+/** Threshold at which the char counter turns red. */
+const DANGER_CHARS = 9500;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * METRIC CARD COMPONENT
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Renders a single before/after metric tile in the Quality Report section.
+ *
+ * Props:
+ *   label          — display name of the metric (e.g. "Readability")
+ *   before / after — numeric values before and after humanization
+ *   unit           — optional suffix string (e.g. "%")
+ *   higherIsBetter — determines whether an increase is shown as green or red
+ * ───────────────────────────────────────────────────────────────────────────── */
 function MetricCard({
   label,
   before,
@@ -69,7 +144,13 @@ function MetricCard({
   higherIsBetter: boolean;
 }) {
   const improved = higherIsBetter ? after >= before : after <= before;
-  const delta = after - before;
+
+  /*
+   * Round delta to 1 decimal place.
+   * Raw float subtraction can produce values like 0.30000000000000004 due to
+   * IEEE-754 representation.  Math.round(x * 10) / 10 clamps to 1 d.p.
+   */
+  const delta = Math.round((after - before) * 10) / 10;
   const sign = delta > 0 ? "+" : "";
 
   return (
@@ -80,6 +161,7 @@ function MetricCard({
           {after}
           {unit}
         </div>
+        {/* Delta badge — green if improvement, red if regression */}
         <div
           className={`text-xs font-medium px-1.5 py-0.5 rounded ${
             improved
@@ -100,19 +182,97 @@ function MetricCard({
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * MAIN PAGE COMPONENT
+ * ───────────────────────────────────────────────────────────────────────────── */
 export default function Home() {
+  // ── Core form state ────────────────────────────────────────────────────────
   const [text, setText] = useState("");
   const [tone, setTone] = useState<Tone>("professional");
   const [strength, setStrength] = useState<Strength>("medium");
   const [preserveKeyPoints, setPreserveKeyPoints] = useState(true);
+
+  // ── Result / loading / error state ────────────────────────────────────────
   const [result, setResult] = useState<HumanizeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── UI feedback state ──────────────────────────────────────────────────────
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [copied, setCopied] = useState(false);
 
+  /**
+   * Index into LOADING_MESSAGES.  Advances every ~1.8 s while loading is true
+   * so the user sees the pipeline stages cycling by.
+   */
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const loadingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+
+  /** Character count of the input text. */
   const charCount = text.length;
+
+  /** Word count of the input text — shown in the input panel header. */
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+
+  /**
+   * Word count of the humanized output — shown next to the Copy button.
+   * Gives users instant feedback on whether the rewrite got shorter/longer.
+   */
+  const outputWordCount = result?.rewritten.trim()
+    ? result.rewritten.trim().split(/\s+/).length
+    : 0;
+
+  /**
+   * Tailwind colour class for the character counter.
+   * Turns amber when nearing the limit and red when very close.
+   */
+  const charCountColor =
+    charCount >= DANGER_CHARS
+      ? "text-danger font-semibold"
+      : charCount >= WARN_CHARS
+        ? "text-warning"
+        : "text-muted";
+
+  // ── Loading message cycling ────────────────────────────────────────────────
+
+  /**
+   * Starts/stops the loading message interval in sync with the `loading` state.
+   * Uses a ref for the interval ID so it doesn't trigger re-renders.
+   */
+  useEffect(() => {
+    if (loading) {
+      // Reset to the first message and start cycling
+      setLoadingMsgIdx(0);
+      loadingIntervalRef.current = setInterval(() => {
+        setLoadingMsgIdx((prev) => (prev + 1) % LOADING_MESSAGES.length);
+      }, 1800);
+    } else {
+      // Clear interval when loading ends
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+        loadingIntervalRef.current = null;
+      }
+    }
+    // Cleanup on unmount
+    return () => {
+      if (loadingIntervalRef.current) clearInterval(loadingIntervalRef.current);
+    };
+  }, [loading]);
+
+  // ── Keyboard shortcut: Cmd+Enter / Ctrl+Enter ─────────────────────────────
+
+  /**
+   * Global keydown listener that submits the form when the user presses
+   * Cmd+Enter (macOS) or Ctrl+Enter (Windows/Linux).
+   *
+   * Reads the latest `text` and `loading` values via a stable ref so the
+   * listener doesn't need to be re-registered on every keystroke.
+   */
+  const submitRef = useRef<() => void>(() => {});
+
+  // ── Submit handler ─────────────────────────────────────────────────────────
 
   const handleSubmit = useCallback(async () => {
     if (!text.trim() || loading) return;
@@ -141,13 +301,35 @@ export default function Home() {
     }
   }, [text, tone, strength, preserveKeyPoints, loading]);
 
+  // Keep submitRef current so the keydown listener always calls the latest version
+  useEffect(() => {
+    submitRef.current = handleSubmit;
+  }, [handleSubmit]);
+
+  // Register global Cmd+Enter / Ctrl+Enter keyboard shortcut
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        submitRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []); // empty deps — listener is registered once; submitRef handles updates
+
+  // ── Other handlers ─────────────────────────────────────────────────────────
+
+  /** Copies the humanized output to the clipboard. */
   const handleCopy = useCallback(async () => {
     if (!result) return;
     await navigator.clipboard.writeText(result.rewritten);
     setCopied(true);
+    // Reset "Copied" badge back to "Copy" after 2 seconds
     setTimeout(() => setCopied(false), 2000);
   }, [result]);
 
+  /** Clears all state — effectively a "start over" action. */
   const handleClear = useCallback(() => {
     setText("");
     setResult(null);
@@ -156,12 +338,40 @@ export default function Home() {
     setCopied(false);
   }, []);
 
+  /* ─────────────────────────────────────────────────────────────────────────
+   * WARNING BANNER LOGIC
+   * ─────────────────────────────────────────────────────────────────────────
+   * Consolidate "retried" and "meaning not preserved" into one banner instead
+   * of two overlapping yellow boxes.  Priority: retried > not preserved.
+   */
+  const warningMessage: string | null = (() => {
+    if (!result) return null;
+    if (result.retried && !result.meaningCheck.preserved) {
+      // Both conditions: re-ran but still has issues
+      return "Meaning drift detected — automatically re-ran with stricter constraints, but some differences remain. Please review carefully.";
+    }
+    if (result.retried) {
+      // Re-ran and meaning is now preserved
+      return "Meaning drift detected — automatically re-ran with stricter constraints.";
+    }
+    if (!result.meaningCheck.preserved) {
+      // No retry needed but evaluator flagged minor issues
+      return "Minor meaning differences detected. Please review carefully.";
+    }
+    return null;
+  })();
+
+  /* ─────────────────────────────────────────────────────────────────────────
+   * RENDER
+   * ───────────────────────────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen flex flex-col relative z-[1]">
-      {/* Header */}
+
+      {/* ── HEADER ────────────────────────────────────────────────────────── */}
       <header className="border-b border-card-border/50 bg-card/50 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between relative">
           <div className="flex items-center gap-3">
+            {/* Ghost logo icon */}
             <div className="w-10 h-10 rounded-2xl bg-ghost-white/10 border border-card-border flex items-center justify-center animate-float shadow-[0_0_24px_rgba(148,163,184,0.15)]">
               <svg
                 width="20"
@@ -193,11 +403,14 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6">
-        {/* Left panel — Input */}
+
+        {/* ── LEFT PANEL: Input ─────────────────────────────────────────── */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           <div className="ghost-card rounded-xl p-4 sm:p-5 flex flex-col flex-1">
+
+            {/* Input panel header: label + word/char counters */}
             <div className="flex items-center justify-between mb-3">
               <label
                 htmlFor="input-text"
@@ -205,22 +418,34 @@ export default function Home() {
               >
                 Original Text
               </label>
-              <div className="flex items-center gap-3 text-xs text-muted">
-                <span>{wordCount} words</span>
-                <span>{charCount.toLocaleString()} / 10,000 chars</span>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-muted">{wordCount} words</span>
+                {/*
+                  * Character counter changes colour as the limit approaches:
+                  *   normal  → muted grey
+                  *   ≥ 8 000 → amber warning
+                  *   ≥ 9 500 → red danger
+                  * This gives users an early visual cue before they hit the wall.
+                  */}
+                <span className={charCountColor}>
+                  {charCount.toLocaleString()} / 10,000 chars
+                </span>
               </div>
             </div>
+
+            {/* Textarea — sliced at MAX_CHARS to enforce the limit client-side */}
             <textarea
               id="input-text"
               className="flex-1 min-h-[240px] w-full bg-surface/50 rounded-lg border border-card-border p-4 text-sm text-foreground placeholder:text-muted/60 resize-none scrollbar-thin focus:border-accent/50 transition-colors"
               placeholder="Paste your AI-generated text here...&#10;&#10;For example, an email draft, blog post, report, or any professional writing that sounds too robotic and needs a human touch."
               value={text}
-              onChange={(e) => setText(e.target.value.slice(0, 10000))}
+              onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
             />
 
-            {/* Controls */}
+            {/* ── Controls ──────────────────────────────────────────────── */}
             <div className="mt-4 space-y-4">
-              {/* Tone */}
+
+              {/* Tone selector */}
               <div>
                 <div className="text-xs font-semibold text-foreground mb-2">
                   Tone
@@ -249,7 +474,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Strength */}
+              {/* Strength selector */}
               <div>
                 <div className="text-xs font-semibold text-foreground mb-2">
                   Rewrite Strength
@@ -280,8 +505,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Preserve key points + Submit */}
+              {/* Preserve key points toggle + Clear + Submit */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+
+                {/* Toggle switch for "Preserve all key points" */}
                 <button
                   type="button"
                   role="switch"
@@ -308,6 +535,7 @@ export default function Home() {
                 </button>
 
                 <div className="flex gap-2 w-full sm:w-auto">
+                  {/* Clear button — only visible when there's something to clear */}
                   {(text || result) && (
                     <button
                       onClick={handleClear}
@@ -316,17 +544,22 @@ export default function Home() {
                       Clear
                     </button>
                   )}
+
+                  {/*
+                    * Submit button.
+                    * Also triggered by Cmd+Enter / Ctrl+Enter (see useEffect above).
+                    * title attribute shows the keyboard shortcut as a tooltip.
+                    */}
                   <button
                     onClick={handleSubmit}
                     disabled={!text.trim() || loading}
+                    title="Ghostify (⌘ Enter)"
                     className="flex-1 sm:flex-none px-6 py-2.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>
-                        <svg
-                          className="animate-spin h-4 w-4"
-                          viewBox="0 0 24 24"
-                        >
+                        {/* Spinner icon */}
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                           <circle
                             className="opacity-25"
                             cx="12"
@@ -354,17 +587,26 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Right panel — Output */}
+        {/* ── RIGHT PANEL: Output ───────────────────────────────────────── */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
-          {/* Output card */}
           <div className="ghost-card rounded-xl p-4 sm:p-5 flex flex-col flex-1">
+
+            {/* Output panel header: label + output word count + copy/feedback */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold text-foreground">
                 Humanized Output
               </span>
               {result && (
                 <div className="flex items-center gap-2">
-                  {/* Feedback buttons */}
+                  {/*
+                    * Output word count — shows how the length changed at a glance.
+                    * e.g. "312 words" next to the Copy button.
+                    */}
+                  <span className="text-xs text-muted hidden sm:inline">
+                    {outputWordCount} words
+                  </span>
+
+                  {/* Thumbs feedback buttons */}
                   <div className="flex items-center gap-1 mr-1">
                     <button
                       onClick={() => setFeedback("up")}
@@ -409,6 +651,8 @@ export default function Home() {
                       </svg>
                     </button>
                   </div>
+
+                  {/* Copy button — shows "Copied" for 2 s after click */}
                   <button
                     onClick={handleCopy}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface text-xs font-medium text-muted hover:text-foreground transition-all"
@@ -437,13 +681,7 @@ export default function Home() {
                           stroke="currentColor"
                           strokeWidth="2"
                         >
-                          <rect
-                            width="14"
-                            height="14"
-                            x="8"
-                            y="8"
-                            rx="2"
-                          />
+                          <rect width="14" height="14" x="8" y="8" rx="2" />
                           <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
                         </svg>
                         Copy
@@ -454,21 +692,30 @@ export default function Home() {
               )}
             </div>
 
-            {/* Output content */}
+            {/* ── Output content area ───────────────────────────────────── */}
             <div className="flex-1 min-h-[240px] rounded-lg bg-surface/50 border border-card-border p-4 scrollbar-thin overflow-y-auto">
+
               {loading ? (
+                /*
+                 * Loading state: spinning animation + cycling informational message.
+                 * LOADING_MESSAGES cycle every 1.8 s (see useEffect above) so
+                 * the user gets a sense of what stage the pipeline is at.
+                 */
                 <div className="h-full flex flex-col items-center justify-center gap-4">
                   <div className="relative">
                     <div className="w-10 h-10 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
                   </div>
-                  <div className="text-sm text-muted">
-                    Ghostifying your text...
+                  {/* Fade-keyed message so each change feels like a transition */}
+                  <div key={loadingMsgIdx} className="text-sm text-muted animate-fade-in">
+                    {LOADING_MESSAGES[loadingMsgIdx]}
                   </div>
                   <div className="w-48 h-1.5 rounded-full overflow-hidden bg-surface">
                     <div className="h-full rounded-full animate-shimmer bg-accent/40" />
                   </div>
                 </div>
+
               ) : error ? (
+                /* Error state */
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center max-w-sm">
                     <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center mx-auto mb-3">
@@ -489,25 +736,32 @@ export default function Home() {
                     <p className="text-sm text-danger font-medium">{error}</p>
                   </div>
                 </div>
+
               ) : result ? (
+                /* Result state */
                 <div className="animate-fade-in">
-                  {result.retried && (
+                  {/*
+                    * Consolidated warning banner.
+                    * Previously two separate banners could stack on top of each other
+                    * (one for "retried", one for "not preserved").  Now there is at
+                    * most ONE banner, combining both signals into a clear message.
+                    */}
+                  {warningMessage && (
                     <div className="mb-3 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning">
-                      Meaning drift detected — automatically re-ran with
-                      stricter constraints.
+                      {warningMessage}
                     </div>
                   )}
-                  {!result.meaningCheck.preserved && (
-                    <div className="mb-3 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning">
-                      Minor meaning differences detected. Please review
-                      carefully.
-                    </div>
-                  )}
+                  {/* The humanized text itself */}
                   <div className="prose-output text-foreground/90">
                     {result.rewritten}
                   </div>
                 </div>
+
               ) : (
+                /*
+                 * Empty state — shown before the user submits anything.
+                 * Makes the empty panel feel inviting rather than just blank.
+                 */
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center max-w-xs">
                     <div className="w-12 h-12 rounded-xl bg-ghost-white/10 border border-card-border flex items-center justify-center mx-auto mb-3">
@@ -527,13 +781,18 @@ export default function Home() {
                       Your humanized text will appear here
                     </p>
                     <p className="text-xs text-muted/50 mt-1">
-                      Paste text on the left and click Ghostify
+                      Paste text on the left and press{" "}
+                      <kbd className="px-1 py-0.5 rounded bg-surface border border-card-border font-mono text-[10px]">
+                        ⌘ Enter
+                      </kbd>{" "}
+                      or click Ghostify
                     </p>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* Feedback confirmation message */}
             {feedback && (
               <div className="mt-3 px-3 py-2 rounded-lg bg-accent-muted text-xs text-accent animate-fade-in">
                 {feedback === "up"
@@ -543,13 +802,14 @@ export default function Home() {
             )}
           </div>
 
-          {/* Metrics card */}
+          {/* ── QUALITY REPORT CARD ──────────────────────────────────────── */}
           {result && (
             <div className="ghost-card rounded-xl p-4 sm:p-5 animate-fade-in">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-foreground">
                   Quality Report
                 </span>
+                {/* Overall score badge — green ≥75, amber ≥50, red below */}
                 <div
                   className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                     result.metrics.overallScore >= 75
@@ -562,6 +822,8 @@ export default function Home() {
                   {result.metrics.overallScore}/100
                 </div>
               </div>
+
+              {/* 2×3 grid of MetricCard components */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 <MetricCard
                   label="Readability"
@@ -588,6 +850,8 @@ export default function Home() {
                   after={result.metrics.fillerCountAfter}
                   higherIsBetter={false}
                 />
+
+                {/* Length Ratio — standalone tile (no before/after, just a ratio) */}
                 <div className="rounded-lg bg-surface/60 p-3">
                   <div className="text-xs text-muted mb-1.5 font-medium">
                     Length Ratio
@@ -603,6 +867,8 @@ export default function Home() {
                         : "Slightly longer"}
                   </div>
                 </div>
+
+                {/* Meaning Check — standalone tile */}
                 <div className="rounded-lg bg-surface/60 p-3">
                   <div className="text-xs text-muted mb-1.5 font-medium">
                     Meaning Check
@@ -628,13 +894,11 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* ── FOOTER ────────────────────────────────────────────────────────── */}
       <footer className="border-t border-card-border/30 bg-card/50 backdrop-blur-sm py-4 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between text-xs text-muted">
           <span>GhostHuman v1.0</span>
-          <span>
-            Built with Next.js + GPT-5 Nano
-          </span>
+          <span>Built with Next.js + GPT-5 Nano</span>
         </div>
       </footer>
     </div>
