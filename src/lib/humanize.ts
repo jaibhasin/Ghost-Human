@@ -128,13 +128,10 @@ async function callRewrite(
     ],
     max_completion_tokens: 4096,
     /*
-     * temperature: 0.7
-     * ─────────────────
-     * Lower than the default (1.0) so the rewrite stays factually grounded
-     * while still producing varied, natural-sounding prose.  At 1.0 the model
-     * is more likely to drift from the original content.
+     * gpt-5-nano only supports the default temperature (1.0),
+     * so we omit the temperature parameter entirely.
+     * The system prompt handles tone control instead.
      */
-    temperature: 0.7,
   });
 
   const out = response.choices[0]?.message?.content?.trim() ?? "";

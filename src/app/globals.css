@@ -1,139 +1,758 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * GLOBAL STYLES — Ghost-Human "Cockpit at Night" Glassmorphic Theme
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * DESIGN PHILOSOPHY:
+ *   Dark and moody like a cockpit at night, but glass edges catch just
+ *   enough light to feel alive. Not flat-dark — dimensional.
+ *   Think Bloomberg Terminal meets Apple Vision Pro.
+ *
+ * LIGHTING MODEL:
+ *   Single soft light source from the upper-left.
+ *   - Top & left edges of panels = brighter (catching light)
+ *   - Bottom & right edges = fade to near-invisible
+ *   - Creates depth & the illusion of real frosted glass
+ *
+ * COLOR SYSTEM:
+ *   --bg:           #060612   (deep void black — darker than pure dark)
+ *   --primary:      #6366f1   (electric indigo — CTAs & primary glow)
+ *   --secondary:    #22d3ee   (cyan — processing states)
+ *   --success:      #10b981   (emerald — high scores, >80%)
+ *   --warning:      #f59e0b   (amber — mid scores, 50-80%)
+ *   --danger:       #ef4444   (red — low scores, <50%)
+ *
+ * EDGE GLOW SYSTEM:
+ *   Glows feel like light leaking from INSIDE the glass, not neon outlines.
+ *   Achieved with 2-3px spread, 8-12px blur on box-shadow.
+ *
+ * GLASS SPEC:
+ *   bg rgba(255,255,255,0.03), gradient border (top-left bright → bottom-right dim),
+ *   backdrop-filter blur(20px) saturate(160%),
+ *   layered shadow: depth + top-edge highlight + faint colored halo
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Google Fonts ─────────────────────────────────────────────────────────
+ * Instrument Serif — elegant display headings (contrast against dark glass)
+ * JetBrains Mono   — scores/metrics with faint colored text-shadow glow
+ * DM Sans          — clean modern body text
+ * ──────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
-/* Ghost theme — ethereal, pale, translucent */
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CSS CUSTOM PROPERTIES (Design Tokens)
+ * ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --background: #0a0d12;
-  --background-glow: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(148, 163, 184, 0.08), transparent 60%);
-  --foreground: #e2e8f0;
-  --foreground-soft: #cbd5e1;
-  --card: rgba(15, 23, 42, 0.7);
-  --card-border: rgba(148, 163, 184, 0.12);
-  --card-glass: rgba(30, 41, 59, 0.4);
-  --accent: #94a3b8;
-  --accent-glow: rgba(148, 163, 184, 0.25);
-  --accent-hover: #cbd5e1;
-  --accent-muted: rgba(148, 163, 184, 0.12);
-  --ghost-white: rgba(241, 245, 249, 0.9);
-  --success: #6ee7b7;
-  --warning: #fcd34d;
-  --danger: #f87171;
-  --muted: #64748b;
-  --surface: rgba(30, 41, 59, 0.5);
-  --surface-ghost: rgba(51, 65, 85, 0.35);
+  /* ── Background ───────────────────────────────────────────────────────── */
+  --bg: #060612;             /* Deep void black — the darkest foundation */
+
+  /* ── Glass panels (edge-focused glassmorphism — glowing borders, clean center) */
+  --glass-bg: rgba(255, 255, 255, 0.035);         /* Subtle fill — center stays clean */
+  --glass-border-bright: rgba(255, 255, 255, 0.22); /* Top-left edge — STRONG light catch */
+  --glass-border-dim: rgba(255, 255, 255, 0.06);    /* Bottom-right edge (shadow side) */
+  --glass-border-hover-bright: rgba(255, 255, 255, 0.35); /* Hover: very prominent edge */
+  --glass-border-hover-dim: rgba(255, 255, 255, 0.14);    /* Hover: even shadow side glows */
+  --glass-inner-bg: rgba(255, 255, 255, 0.04);    /* Nested card — clean center */
+
+  /* Edge-focused glass shadow: depth + bright top rim + outer glow halo */
+  --glass-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 0 1px rgba(255, 255, 255, 0.10),
+    0 0 40px rgba(99, 102, 241, 0.08);
+
+  /* Hover: edges flare up — intense border glow radiates outward */
+  --glass-shadow-hover:
+    0 16px 64px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 2px rgba(255, 255, 255, 0.15),
+    0 0 30px rgba(99, 102, 241, 0.12),
+    0 0 80px rgba(99, 102, 241, 0.06);
+
+  /* ── Typography (Directional lighting: bright headings, dim muted text) */
+  --text-heading: rgba(255, 255, 255, 0.92);   /* Almost white, sharp */
+  --text-body: rgba(255, 255, 255, 0.75);       /* Soft but readable */
+  --text-muted: rgba(255, 255, 255, 0.40);      /* Recedes into the glass */
+  --text-mono: rgba(255, 255, 255, 0.82);       /* Slightly brighter than body */
+
+  /* ── Accent palette ───────────────────────────────────────────────────── */
+  --primary: #6366f1;
+  --primary-glow: rgba(99, 102, 241, 0.20);     /* Edge glow: soft, not neon */
+  --primary-glow-intense: rgba(99, 102, 241, 0.35);
+  --secondary: #22d3ee;
+  --secondary-glow: rgba(34, 211, 238, 0.20);   /* Processing state edge glow */
+  --success: #10b981;
+  --success-glow: rgba(16, 185, 129, 0.15);     /* Subtler — emerald is bright */
+  --warning: #f59e0b;
+  --warning-glow: rgba(245, 158, 11, 0.15);
+  --danger: #ef4444;
+  --danger-glow: rgba(239, 68, 68, 0.15);
+
+  /* ── Fonts ────────────────────────────────────────────────────────────── */
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
 }
 
+/* ─── Tailwind Theme Mapping ──────────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-border: var(--card-border);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-muted: var(--accent-muted);
-  --color-ghost-white: var(--ghost-white);
+  --color-bg: var(--bg);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --color-muted: var(--muted);
-  --color-surface: var(--surface);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+ * BASE STYLES
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+* { box-sizing: border-box; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  background: var(--bg);
+  color: var(--text-body);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: var(--background-glow);
-  pointer-events: none;
-  z-index: 0;
+  overflow-x: hidden;
 }
 
 ::selection {
-  background: var(--accent-muted);
-  color: var(--ghost-white);
+  background: rgba(99, 102, 241, 0.3);
+  color: #fff;
 }
 
-textarea:focus,
-select:focus,
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ANIMATED MESH GRADIENT BACKGROUND
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Three MUTED colored blobs (indigo, violet, slate) drift slowly on a 30s
+ * cycle. These feel like distant nebulae — not bright splashes.
+ * Blur is 140px (very diffuse) and opacity is 0.22 (barely visible).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.mesh-gradient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
+
+/* Background blobs kept subtle — glass effect lives on edges, not center */
+.mesh-gradient .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);        /* Diffuse — ambient color only */
+  opacity: 0.25;              /* Subtle — doesn't compete with edge effects */
+  will-change: transform;
+}
+
+/* Blob 1: Muted indigo — upper-left (light source, stays at edges) */
+.blob-1 {
+  width: 650px;
+  height: 650px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.5) 0%, transparent 70%);
+  top: -12%;
+  left: -8%;
+  animation: blob-drift-1 30s ease-in-out infinite;
+}
+
+/* Blob 2: Muted violet — center-right (secondary ambient) */
+.blob-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.4) 0%, transparent 70%);
+  top: 35%;
+  right: -12%;
+  animation: blob-drift-2 30s ease-in-out infinite;
+}
+
+/* Blob 3: Cool slate — bottom region (deep, subtle) */
+.blob-3 {
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(51, 65, 85, 0.35) 0%, transparent 70%);
+  bottom: -18%;
+  left: 25%;
+  animation: blob-drift-3 30s ease-in-out infinite;
+}
+
+/* Slow organic drift keyframes — barely perceptible movement */
+@keyframes blob-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, 50px) scale(1.08); }
+  66% { transform: translate(90px, -30px) scale(0.95); }
+}
+
+@keyframes blob-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, 60px) scale(1.05); }
+  66% { transform: translate(-80px, -40px) scale(0.97); }
+}
+
+@keyframes blob-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(50px, -35px) scale(1.06); }
+  66% { transform: translate(-60px, -50px) scale(0.94); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * GLASSMORPHISM — LUMINOUS EDGE PANELS
+ * ═══════════════════════════════════════════════════════════════════════════
+ * KEY TECHNIQUE: Gradient border simulates directional lighting.
+ *   - Top-left corner is brighter (light catch)
+ *   - Bottom-right fades to near-invisible (shadow side)
+ *
+ * Uses border-image with a linear-gradient from upper-left bright to
+ * lower-right dim. Combined with an inner top-edge highlight (inset shadow)
+ * and a subtle top-to-bottom gradient overlay for "light on glass" effect.
+ *
+ * The ::before pseudo-element creates the inner lightness gradient:
+ *   rgba(255,255,255,0.06) at top → transparent at 40% height
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-panel {
+  background: var(--glass-bg);
+  border: 1px solid transparent;
+  /* Gradient border: bright top-left to dim bottom-right */
+  border-image: linear-gradient(
+    135deg,
+    var(--glass-border-bright) 0%,
+    rgba(255, 255, 255, 0.10) 40%,
+    var(--glass-border-dim) 100%
+  ) 1;
+  /* Frosted glass blur — subtle center, the edges do the heavy lifting */
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  box-shadow: var(--glass-shadow);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.4s ease, transform 0.3s ease;
+}
+
+/* Edge-focused light overlay — bright rim at top/left, fades toward center */
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Only lights up the outer edges, center stays clean */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, transparent 15%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0%, transparent 12%);
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Edge glow ring — colored light that hugs the border, not the interior */
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  /* Inset shadow creates a glowing rim around the inside edge of the panel */
+  box-shadow:
+    inset 0 0 20px rgba(99, 102, 241, 0.06),
+    inset 0 0 1px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Hover: top edge brightens, panel lifts with intensified glow */
+.glass-panel:hover {
+  border-image: linear-gradient(
+    135deg,
+    var(--glass-border-hover-bright) 0%,
+    rgba(255, 255, 255, 0.15) 40%,
+    var(--glass-border-hover-dim) 100%
+  ) 1;
+  box-shadow: var(--glass-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* Edge-focused glassmorphism: outline is the primary visual "glass edge" */
+.glass-panel {
+  border: none;
+  /* Thicker outline for a more prominent glass edge */
+  outline: 1.5px solid var(--glass-border-bright);
+  outline-offset: -1px;
+  border-radius: 20px;
+}
+
+/* Hover: edges light up dramatically */
+.glass-panel:hover {
+  outline: 1.5px solid var(--glass-border-hover-bright);
+}
+
+/* ─── Nested glass card — edge-focused glassmorphism on inner cards ───── */
+.glass-card {
+  background: var(--glass-inner-bg);
+  border: 1px solid transparent;
+  /* Bright glass-edge outline */
+  outline: 1.5px solid rgba(255, 255, 255, 0.12);
+  outline-offset: -1px;
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  /* Edge-focused shadow: top rim highlight + outer glow halo */
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Edge-only top highlight on inner cards — clean center */
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 12%
+  );
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Hover: edges flare with indigo glow radiating outward from border */
+.glass-card:hover {
+  outline-color: rgba(99, 102, 241, 0.25);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 1px rgba(255, 255, 255, 0.12),
+    0 0 15px 2px var(--primary-glow),
+    0 0 40px rgba(99, 102, 241, 0.06);
+  transform: translateY(-2px);
+}
+
+/* ─── Frosted nav — glass edges glow, center stays clean ──────────────── */
+.glass-nav {
+  background: rgba(6, 6, 18, 0.70);
+  /* Bright bottom edge — the main visible glass edge on the nav */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(30px) saturate(170%);
+  -webkit-backdrop-filter: blur(30px) saturate(170%);
+  /* Edge highlights: bright top rim + glowing bottom border + outer halo */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 1px 0 rgba(99, 102, 241, 0.08),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CTA BUTTON — "Humanize" with Luminous Edge Glow
+ * ═══════════════════════════════════════════════════════════════════════════
+ * The glow feels like light leaking from inside the button, not a harsh
+ * neon outline. Uses 2-3px spread, 8-12px blur for soft internal light.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.btn-humanize {
+  background: linear-gradient(135deg, #6366f1, #7c3aed, #6366f1);
+  background-size: 200% 200%;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  /* Soft indigo glow: 2px spread, 12px blur — light leaking from inside */
+  box-shadow:
+    0 0 12px 2px var(--primary-glow),
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+  animation: btn-glow-breathe 3s ease-in-out infinite;
+}
+
+.btn-humanize:hover:not(:disabled) {
+  animation: gradient-sweep 2s ease infinite, btn-glow-breathe 3s ease-in-out infinite;
+  box-shadow:
+    0 0 20px 3px var(--primary-glow-intense),
+    0 0 50px rgba(99, 102, 241, 0.12),
+    0 4px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-humanize:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 0 25px 4px var(--primary-glow-intense),
+    0 0 60px rgba(99, 102, 241, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-humanize:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  animation: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Gentle breathing glow — not a harsh flash, just a slow inhale/exhale */
+@keyframes btn-glow-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 12px 2px var(--primary-glow),
+      0 4px 20px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 18px 3px var(--primary-glow-intense),
+      0 0 40px rgba(99, 102, 241, 0.08),
+      0 4px 20px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  }
+}
+
+@keyframes gradient-sweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PIPELINE PROGRESS VISUALIZATION
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.pipeline-line {
+  position: relative;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  flex: 1;
+  overflow: hidden;
+}
+
+.pipeline-line.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--primary), var(--secondary), transparent);
+  background-size: 200% 100%;
+  animation: pipeline-flow 1.5s ease-in-out infinite;
+}
+
+.pipeline-line.completed {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+@keyframes pipeline-flow {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.pipeline-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.stage-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.5s ease;
+  color: var(--text-muted);
+}
+
+/* Active stage: indigo edge glow leaking from inside */
+.stage-icon.active {
+  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--primary);
+  box-shadow:
+    0 0 12px 2px var(--primary-glow),
+    inset 0 0 8px rgba(99, 102, 241, 0.1);
+  animation: stage-breathe 1.5s ease-in-out infinite;
+}
+
+/* Completed stage: emerald edge glow */
+.stage-icon.completed {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--success);
+  box-shadow: 0 0 10px 2px var(--success-glow);
+}
+
+@keyframes stage-breathe {
+  0%, 100% { box-shadow: 0 0 12px 2px var(--primary-glow), inset 0 0 8px rgba(99, 102, 241, 0.1); }
+  50% { box-shadow: 0 0 20px 3px var(--primary-glow-intense), inset 0 0 12px rgba(99, 102, 241, 0.15); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RADIAL PROGRESS INDICATOR
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.radial-progress {
+  transform: rotate(-90deg);
+}
+
+.radial-progress circle {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.5s ease-out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PAGE LOAD STAGGER ANIMATIONS
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Panels fade + slide up from 30px below with staggered delays.
+ * The stagger creates a cascading reveal effect.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-stagger-1 {
+  animation: fade-slide-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0ms;
+  opacity: 0;
+}
+
+.animate-stagger-2 {
+  animation: fade-slide-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 150ms;
+  opacity: 0;
+}
+
+.animate-stagger-3 {
+  animation: fade-slide-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 300ms;
+  opacity: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SHIMMER / SKELETON LOADING STATE
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes shimmer-skeleton {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.015) 25%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.015) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-skeleton 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UTILITY ANIMATIONS
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.5; box-shadow: 0 0 20px var(--accent-glow); }
-  50% { opacity: 0.8; box-shadow: 0 0 28px var(--accent-glow); }
+@keyframes countUp {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
 }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+.animate-count-up {
+  animation: countUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-.animate-glow {
-  animation: glow-pulse 2.5s ease-in-out infinite;
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TEXTAREA & INPUT STYLES
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Text areas have a faint inner glow: inset 0 0 20px rgba(99,102,241,0.03)
+ * which creates the feeling of dim ambient light inside the input field.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+textarea {
+  font-family: var(--font-body);
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg, var(--card) 25%, var(--surface) 50%, var(--card) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+/* Focus: strong indigo edge glow radiates from the border outward */
+textarea:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.45) !important;
+  box-shadow:
+    0 0 0 2px rgba(99, 102, 241, 0.12),
+    0 0 15px rgba(99, 102, 241, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
 }
 
-.ghost-theme .ghost-card {
-  background: var(--card);
-  border: 1px solid var(--card-border);
-  backdrop-filter: blur(12px);
+/* ─── Pill toggle buttons ──────────────────────────────────────────────── */
+.pill-toggle {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.prose-output {
-  line-height: 1.8;
-  font-size: 0.975rem;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+/* Hover: soft indigo edge glow (light leaking from inside) */
+.pill-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.10);
+  color: var(--text-body);
+  box-shadow: 0 0 10px 1px rgba(99, 102, 241, 0.08);
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
+/* Active pill: indigo glow border with inner light */
+.pill-toggle.active {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #818cf8;
+  box-shadow:
+    0 0 12px 2px var(--primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
+
+/* ─── Intensity slider ─────────────────────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
 }
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  /* Soft glow from the thumb — light leaking from inside */
+  box-shadow: 0 0 8px 2px var(--primary-glow);
+  transition: box-shadow 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 14px 3px var(--primary-glow-intense);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SCROLLBAR — minimal, recedes into the dark
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.scrollbar-thin::-webkit-scrollbar { width: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 3px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SETTINGS DRAWER
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Settings drawer — edge-glowing glass side panel */
+.settings-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  background: rgba(6, 6, 18, 0.85);
+  /* Strong left edge — the main glass edge of the drawer */
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(30px) saturate(170%);
+  -webkit-backdrop-filter: blur(30px) saturate(170%);
+  z-index: 50;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow-y: auto;
+  /* Edge-focused: bright left rim + outward glow halo from the border */
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    -2px 0 20px rgba(99, 102, 241, 0.08),
+    -8px 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.settings-drawer.open {
+  transform: translateX(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * COPY MICRO-ANIMATION — emerald edge glow flash
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes copy-pop {
+  0% { transform: scale(1); box-shadow: none; }
+  50% { transform: scale(1.05); box-shadow: 0 0 12px 2px var(--success-glow); }
+  100% { transform: scale(1); box-shadow: none; }
+}
+
+.animate-copy-pop {
+  animation: copy-pop 0.35s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PROSE OUTPUT
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.prose-output {
+  line-height: 1.85;
+  font-size: 0.95rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: var(--font-body);
+  color: var(--text-body);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DIFF HIGHLIGHTING
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.diff-highlight {
+  background: rgba(99, 102, 241, 0.12);
+  border-radius: 3px;
+  padding: 1px 4px;
 }
